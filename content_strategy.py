@@ -2,7 +2,10 @@ from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from gemini_client import client, MODEL
+from gemini_client import (
+    get_gemini_client,
+    MODEL,
+)
 
 
 # ---------------------------------
@@ -92,8 +95,8 @@ def generate_content_strategy(
     cluster_df
 ):
 
-    # Convert the selected DataFrame rows
-    # into readable text for Gemini
+    client = get_gemini_client()
+    
     keyword_lines = []
 
     for _, row in cluster_df.iterrows():

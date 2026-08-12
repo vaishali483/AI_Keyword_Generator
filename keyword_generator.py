@@ -2,7 +2,10 @@ from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from gemini_client import client, MODEL
+from gemini_client import (
+    get_gemini_client,
+    MODEL,
+)
 
 
 # ---------------------------------
@@ -75,6 +78,8 @@ def generate_keywords(
     Avoid duplicate or nearly identical keywords.
     """
 
+    client = get_gemini_client()
+    
     interaction = client.interactions.create(
 
         model=MODEL,
