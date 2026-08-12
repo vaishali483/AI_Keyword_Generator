@@ -460,52 +460,6 @@ Generated content strategies can be exported as Markdown containing:
 
 ---
 
-# Public Demo and API Usage
-
-The production Gemini integration uses an API key belonging to the person running the application.
-
-A publicly deployed application using a single server-side Gemini API key would cause all visitors to consume quota belonging to that API project.
-
-For this reason, the recommended public portfolio deployment uses **demo/sample data instead of making unrestricted Gemini API calls**.
-
-The full AI functionality remains available when running the project locally with a valid Gemini API key.
-
-This approach allows the interface and NLP pipeline to be demonstrated publicly without exposing credentials or exhausting a personal API quota.
-
----
-
-# Example Use Case
-
-Seed topic:
-
-```text
-project management software
-```
-
-Possible keyword research:
-
-```text
-project management software
-best project management software
-project management software for small business
-free project management software
-how to choose project management software
-project management software comparison
-```
-
-The application then:
-
-1. Determines search intent.
-2. Classifies keyword type.
-3. Creates TF-IDF representations.
-4. Groups keywords using KMeans.
-5. Generates SEO priority scores.
-6. Recommends content formats.
-7. Displays the results in an interactive dashboard.
-8. Generates a content strategy for a selected cluster.
-
----
-
 # Key Concepts Demonstrated
 
 This project demonstrates practical experience with:
