@@ -3,7 +3,9 @@ import re
 import pandas as pd
 import streamlit as st
 
+from content_strategy import generate_content_strategy
 from keyword_generator import generate_keywords
+
 from seo_utils import (
     add_keyword_clusters,
     add_keyword_type,
@@ -256,11 +258,12 @@ if "keyword_results" in st.session_state:
     # Dashboard tabs
     # ---------------------------------
 
-    results_tab, intent_tab, cluster_tab = st.tabs(
+    results_tab, intent_tab, cluster_tab, strategy_tab = st.tabs(
         [
             "📋 Keyword Results",
             "🎯 Search Intent",
-            "🧩 Keyword Clusters"
+            "🧩 Keyword Clusters",
+            "🧠 Content Strategy"
         ]
     )
 
@@ -323,28 +326,274 @@ if "keyword_results" in st.session_state:
             hide_index=True
         )
 
-        with cluster_tab:
+    with cluster_tab:
 
-            st.subheader("Keyword Cluster Distribution")
+        st.subheader("Keyword Cluster Distribution")
 
-            cluster_counts = (
-                filtered_df["Cluster"]
-                .value_counts()
-                .rename_axis("Cluster")
-                .reset_index(name="Keywords")
+        cluster_counts = (
+            filtered_df["Cluster"]
+            .value_counts()
+            .rename_axis("Cluster")
+            .reset_index(name="Keywords")
+        )
+
+        st.bar_chart(
+            cluster_counts,
+            x="Cluster",
+            y="Keywords"
+        )
+
+        st.dataframe(
+            cluster_counts,
+            width="stretch",
+            hide_index=True
+        )
+
+    # ---------------------------------
+    # Strategy Tab
+    # ---------------------------------
+
+    with strategy_tab:
+
+        st.subheader(
+            "🧠 AI Content Strategy"
+        )
+
+        st.write(
+            "Select a keyword cluster and let Gemini "
+            "turn your keyword research into a content plan."
+        )
+
+
+        # Choose cluster
+
+        available_clusters = sorted(
+            df["Cluster"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+
+
+        selected_cluster = st.selectbox(
+            "Choose a keyword cluster",
+            available_clusters
+        )
+
+
+        # Get keywords in selected cluster
+
+        cluster_df = df[
+            df["Cluster"] == selected_cluster
+        ].copy()
+
+
+        st.write(
+            f"**Keywords in this cluster: "
+            f"{len(cluster_df)}**"
+        )
+
+
+        st.dataframe(
+            cluster_df[
+                [
+                    "Keyword",
+                    "Search Intent",
+                    "SEO Priority Score"
+                ]
+            ],
+            width="stretch",
+            hide_index=True
+        )
+
+
+        # Generate strategy
+
+        if st.button(
+            "✨ Generate Content Strategy",
+            type="primary"
+        ):
+
+            try:
+
+                with st.spinner(
+                    "Gemini is building your "
+                    "content strategy..."
+                ):
+
+                    strategy = generate_content_strategy(
+                        seed_topic=st.session_state[
+                            "seed_topic"
+                        ],
+                        cluster_name=selected_cluster,
+                        cluster_df=cluster_df
+                    )
+
+
+                    st.session_state[
+                        "content_strategy"
+                    ] = strategy
+
+
+                    st.session_state[
+                        "strategy_cluster"
+                    ] = selected_cluster
+
+
+            except Exception as e:
+
+                st.error(
+                    f"Could not generate strategy: {e}"
+                )
+
+        # Display generated strategy
+
+        if (
+            "content_strategy" in st.session_state
+            and
+            st.session_state.get(
+                "strategy_cluster"
+            ) == selected_cluster
+        ):
+
+            strategy = st.session_state[
+                "content_strategy"
+            ]
+
+
+            st.divider()
+
+
+            # Strategy overview
+
+            st.subheader(
+                "Strategy Overview"
             )
 
-            st.bar_chart(
-                cluster_counts,
-                x="Cluster",
-                y="Keywords"
+
+            col1, col2 = st.columns(2)
+
+
+            col1.metric(
+                "Target Audience",
+                strategy.target_audience
             )
 
-            st.dataframe(
-                cluster_counts,
-                width="stretch",
-                hide_index=True
+
+            col2.metric(
+                "Funnel Stage",
+                strategy.funnel_stage
             )
+
+
+            st.write(
+                strategy.strategy_summary
+            )
+
+        # Content ideas
+
+        st.subheader(
+            "Recommended Content Ideas"
+        )
+
+
+        content_rows = []
+
+
+        for idea in strategy.content_ideas:
+
+            content_rows.append(
+                {
+                    "Title": idea.title,
+
+                    "Primary Keyword":
+                        idea.primary_keyword,
+
+                    "Search Intent":
+                        idea.search_intent,
+
+                    "Format":
+                        idea.content_format,
+
+                    "Content Angle":
+                        idea.content_angle
+                }
+            )
+
+
+        content_df = pd.DataFrame(
+            content_rows
+        )
+
+
+        st.dataframe(
+            content_df,
+            width="stretch",
+            hide_index=True
+        )
+
+        st.subheader(
+            "Content Details"
+        )
+
+
+        for number, idea in enumerate(
+            strategy.content_ideas,
+            start=1
+        ):
+
+            with st.expander(
+                f"{number}. {idea.title}"
+            ):
+
+                st.write(
+                    f"**Primary Keyword:** "
+                    f"{idea.primary_keyword}"
+                )
+
+                st.write(
+                    f"**Search Intent:** "
+                    f"{idea.search_intent}"
+                )
+
+                st.write(
+                    f"**Content Format:** "
+                    f"{idea.content_format}"
+                )
+
+                st.write(
+                    f"**Content Angle:** "
+                    f"{idea.content_angle}"
+                )
+
+                st.write(
+                    "**Supporting Keywords:**"
+                )
+
+                for keyword in (
+                    idea.supporting_keywords
+                ):
+
+                    st.write(
+                        f"- {keyword}"
+                    )
+
+        st.subheader(
+            "Recommended Content Outline"
+        )
+
+
+        for section_number, section in enumerate(
+            strategy.recommended_outline,
+            start=1
+        ):
+
+            st.write(
+                f"{section_number}. {section}"
+            )
+
+
+        
 
     # ---------------------------------
     # CSV export
