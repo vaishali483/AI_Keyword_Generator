@@ -4,9 +4,9 @@ from seo_utils import (
     add_keyword_type,
     add_priority_score,
     add_content_format,
+    add_keyword_clusters,
 )
 
-from seo_utils import add_keyword_clusters
 
 def create_test_dataframe():
 
@@ -57,12 +57,9 @@ def test_priority_score():
     )
 
     assert (
-        result[
-            "SEO Priority Score"
-        ].between(
-            0,
-            100
-        ).all()
+        result["SEO Priority Score"]
+        .between(0, 100)
+        .all()
     )
 
 
@@ -87,6 +84,7 @@ def test_content_format():
         ]
         == "Landing / Product Page"
     )
+
 
 def test_keyword_clustering():
 

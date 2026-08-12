@@ -161,8 +161,8 @@ if st.button(
                 get_friendly_error(e)
             )
 
-            print(
-                f"Keyword generation error: {e}"
+            logger.exception(
+                "Keyword generation failed"
             )
 
 
