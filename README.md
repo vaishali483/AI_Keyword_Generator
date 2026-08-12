@@ -305,7 +305,7 @@ AI_Keyword_Generator/
 
 ---
 
-# 🖼️ Screenshots
+# Screenshots
 
 ## Keyword Research Dashboard
 
@@ -331,7 +331,7 @@ A selected keyword cluster can be transformed into a structured content strategy
 
 ---
 
-# ⚙️ Installation
+# Installation
 
 ## 1. Clone the repository
 
