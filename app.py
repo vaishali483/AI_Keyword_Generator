@@ -6,6 +6,10 @@ import streamlit as st
 from content_strategy import generate_content_strategy
 from keyword_generator import generate_keywords
 
+from error_handler import get_friendly_error
+from validators import validate_topic
+from logger import logger
+
 from seo_utils import (
     add_keyword_clusters,
     add_keyword_type,
@@ -78,11 +82,11 @@ if st.button(
     type="primary"
 ):
 
-    if not topic.strip():
+    is_valid, validation_result = validate_topic(topic)
 
-        st.warning(
-            "Please enter a topic or seed keyword."
-        )
+    if not is_valid:
+
+        st.warning(validation_result)
 
     else:
 
@@ -141,10 +145,24 @@ if st.button(
                     "seed_topic"
                 ] = topic
 
+                # Clear any strategy from a previous topic.
+                st.session_state.pop(
+                    "content_strategy",
+                    None
+                )
+                st.session_state.pop(
+                    "strategy_cluster",
+                    None
+                )
+
         except Exception as e:
 
             st.error(
-                f"Something went wrong: {e}"
+                get_friendly_error(e)
+            )
+
+            print(
+                f"Keyword generation error: {e}"
             )
 
 
@@ -252,6 +270,19 @@ if "keyword_results" in st.session_state:
             selected_types
         )
     ]
+
+
+    # Safe filename version of the seed topic
+    safe_topic = re.sub(
+        r"[^a-zA-Z0-9_-]+",
+        "_",
+        st.session_state[
+            "seed_topic"
+        ].strip()
+    ).strip("_")
+
+    if not safe_topic:
+        safe_topic = "seo_keywords"
 
 
     # ---------------------------------
@@ -364,8 +395,9 @@ if "keyword_results" in st.session_state:
             "turn your keyword research into a content plan."
         )
 
-
+        # ---------------------------------
         # Choose cluster
+        # ---------------------------------
 
         available_clusters = sorted(
             df["Cluster"]
@@ -374,226 +406,317 @@ if "keyword_results" in st.session_state:
             .tolist()
         )
 
-
-        selected_cluster = st.selectbox(
-            "Choose a keyword cluster",
-            available_clusters
-        )
-
-
-        # Get keywords in selected cluster
-
-        cluster_df = df[
-            df["Cluster"] == selected_cluster
-        ].copy()
-
-
-        st.write(
-            f"**Keywords in this cluster: "
-            f"{len(cluster_df)}**"
-        )
-
-
-        st.dataframe(
-            cluster_df[
-                [
-                    "Keyword",
-                    "Search Intent",
-                    "SEO Priority Score"
-                ]
-            ],
-            width="stretch",
-            hide_index=True
-        )
-
-
-        # Generate strategy
-
-        if st.button(
-            "✨ Generate Content Strategy",
-            type="primary"
-        ):
-
-            try:
-
-                with st.spinner(
-                    "Gemini is building your "
-                    "content strategy..."
-                ):
-
-                    strategy = generate_content_strategy(
-                        seed_topic=st.session_state[
-                            "seed_topic"
-                        ],
-                        cluster_name=selected_cluster,
-                        cluster_df=cluster_df
-                    )
-
-
-                    st.session_state[
-                        "content_strategy"
-                    ] = strategy
-
-
-                    st.session_state[
-                        "strategy_cluster"
-                    ] = selected_cluster
-
-
-            except Exception as e:
-
-                st.error(
-                    f"Could not generate strategy: {e}"
-                )
-
-        # Display generated strategy
-
-        if (
-            "content_strategy" in st.session_state
-            and
-            st.session_state.get(
-                "strategy_cluster"
-            ) == selected_cluster
-        ):
-
-            strategy = st.session_state[
-                "content_strategy"
-            ]
-
-
-            st.divider()
-
-
-            # Strategy overview
-
-            st.subheader(
-                "Strategy Overview"
+        if not available_clusters:
+            st.info(
+                "No keyword clusters are available yet."
             )
 
-
-            col1, col2 = st.columns(2)
-
-
-            col1.metric(
-                "Target Audience",
-                strategy.target_audience
+        else:
+            selected_cluster = st.selectbox(
+                "Choose a keyword cluster",
+                available_clusters
             )
 
+            # ---------------------------------
+            # Get keywords in selected cluster
+            # ---------------------------------
 
-            col2.metric(
-                "Funnel Stage",
-                strategy.funnel_stage
-            )
-
+            cluster_df = df[
+                df["Cluster"] == selected_cluster
+            ].copy()
 
             st.write(
-                strategy.strategy_summary
+                f"**Keywords in this cluster: "
+                f"{len(cluster_df)}**"
             )
 
-        # Content ideas
-
-        st.subheader(
-            "Recommended Content Ideas"
-        )
-
-
-        content_rows = []
-
-
-        for idea in strategy.content_ideas:
-
-            content_rows.append(
-                {
-                    "Title": idea.title,
-
-                    "Primary Keyword":
-                        idea.primary_keyword,
-
-                    "Search Intent":
-                        idea.search_intent,
-
-                    "Format":
-                        idea.content_format,
-
-                    "Content Angle":
-                        idea.content_angle
-                }
+            st.dataframe(
+                cluster_df[
+                    [
+                        "Keyword",
+                        "Search Intent",
+                        "SEO Priority Score"
+                    ]
+                ],
+                width="stretch",
+                hide_index=True
             )
 
+            # ---------------------------------
+            # Generate strategy
+            # ---------------------------------
 
-        content_df = pd.DataFrame(
-            content_rows
-        )
-
-
-        st.dataframe(
-            content_df,
-            width="stretch",
-            hide_index=True
-        )
-
-        st.subheader(
-            "Content Details"
-        )
-
-
-        for number, idea in enumerate(
-            strategy.content_ideas,
-            start=1
-        ):
-
-            with st.expander(
-                f"{number}. {idea.title}"
+            if st.button(
+                "✨ Generate Content Strategy",
+                type="primary"
             ):
 
-                st.write(
-                    f"**Primary Keyword:** "
-                    f"{idea.primary_keyword}"
-                )
+                try:
+                    with st.spinner(
+                        "Gemini is building your "
+                        "content strategy..."
+                    ):
+                        strategy = generate_content_strategy(
+                            seed_topic=st.session_state[
+                                "seed_topic"
+                            ],
+                            cluster_name=selected_cluster,
+                            cluster_df=cluster_df
+                        )
 
-                st.write(
-                    f"**Search Intent:** "
-                    f"{idea.search_intent}"
-                )
+                        st.session_state[
+                            "content_strategy"
+                        ] = strategy
 
-                st.write(
-                    f"**Content Format:** "
-                    f"{idea.content_format}"
-                )
+                        st.session_state[
+                            "strategy_cluster"
+                        ] = selected_cluster
 
-                st.write(
-                    f"**Content Angle:** "
-                    f"{idea.content_angle}"
-                )
+                except Exception as e:
 
-                st.write(
-                    "**Supporting Keywords:**"
-                )
-
-                for keyword in (
-                    idea.supporting_keywords
-                ):
-
-                    st.write(
-                        f"- {keyword}"
+                    st.error(
+                        get_friendly_error(e)
                     )
 
-        st.subheader(
-            "Recommended Content Outline"
-        )
+                    print(
+                        f"Content strategy error: {e}"
+                    )
 
+            # ---------------------------------
+            # Display generated strategy
+            # ---------------------------------
 
-        for section_number, section in enumerate(
-            strategy.recommended_outline,
-            start=1
-        ):
+            if (
+                "content_strategy" in st.session_state
+                and
+                st.session_state.get(
+                    "strategy_cluster"
+                ) == selected_cluster
+            ):
+                strategy = st.session_state[
+                    "content_strategy"
+                ]
 
-            st.write(
-                f"{section_number}. {section}"
-            )
+                st.divider()
 
+                # ---------------------------------
+                # Strategy overview
+                # ---------------------------------
 
-        
+                st.subheader(
+                    "Strategy Overview"
+                )
+
+                col1, col2 = st.columns(2)
+
+                col1.metric(
+                    "Target Audience",
+                    strategy.target_audience
+                )
+
+                col2.metric(
+                    "Funnel Stage",
+                    strategy.funnel_stage
+                )
+
+                st.write(
+                    strategy.strategy_summary
+                )
+
+                # ---------------------------------
+                # Content ideas
+                # ---------------------------------
+
+                st.subheader(
+                    "Recommended Content Ideas"
+                )
+
+                content_rows = []
+
+                for idea in strategy.content_ideas:
+                    content_rows.append(
+                        {
+                            "Title": idea.title,
+                            "Primary Keyword": (
+                                idea.primary_keyword
+                            ),
+                            "Search Intent": (
+                                idea.search_intent
+                            ),
+                            "Format": (
+                                idea.content_format
+                            ),
+                            "Content Angle": (
+                                idea.content_angle
+                            )
+                        }
+                    )
+
+                content_df = pd.DataFrame(
+                    content_rows
+                )
+
+                st.dataframe(
+                    content_df,
+                    width="stretch",
+                    hide_index=True
+                )
+
+                # ---------------------------------
+                # Content details
+                # ---------------------------------
+
+                st.subheader(
+                    "Content Details"
+                )
+
+                for number, idea in enumerate(
+                    strategy.content_ideas,
+                    start=1
+                ):
+                    with st.expander(
+                        f"{number}. {idea.title}"
+                    ):
+                        st.write(
+                            f"**Primary Keyword:** "
+                            f"{idea.primary_keyword}"
+                        )
+
+                        st.write(
+                            f"**Search Intent:** "
+                            f"{idea.search_intent}"
+                        )
+
+                        st.write(
+                            f"**Content Format:** "
+                            f"{idea.content_format}"
+                        )
+
+                        st.write(
+                            f"**Content Angle:** "
+                            f"{idea.content_angle}"
+                        )
+
+                        st.write(
+                            "**Supporting Keywords:**"
+                        )
+
+                        for keyword in (
+                            idea.supporting_keywords
+                        ):
+                            st.write(
+                                f"- {keyword}"
+                            )
+
+                # ---------------------------------
+                # Recommended outline
+                # ---------------------------------
+
+                st.subheader(
+                    "Recommended Content Outline"
+                )
+
+                for section_number, section in enumerate(
+                    strategy.recommended_outline,
+                    start=1
+                ):
+                    st.write(
+                        f"{section_number}. {section}"
+                    )
+
+                # ---------------------------------
+                # Markdown export
+                # ---------------------------------
+
+                markdown_content = f"""# SEO Content Strategy
+
+## Seed Topic
+
+{st.session_state["seed_topic"]}
+
+## Keyword Cluster
+
+{selected_cluster}
+
+## Target Audience
+
+{strategy.target_audience}
+
+## Funnel Stage
+
+{strategy.funnel_stage}
+
+## Strategy Summary
+
+{strategy.strategy_summary}
+
+## Content Ideas
+"""
+
+                for number, idea in enumerate(
+                    strategy.content_ideas,
+                    start=1
+                ):
+                    markdown_content += f"""
+
+### {number}. {idea.title}
+
+**Primary Keyword:** {idea.primary_keyword}
+
+**Search Intent:** {idea.search_intent}
+
+**Content Format:** {idea.content_format}
+
+**Content Angle:** {idea.content_angle}
+
+**Supporting Keywords:**
+
+"""
+
+                    for keyword in (
+                        idea.supporting_keywords
+                    ):
+                        markdown_content += (
+                            f"- {keyword}\n"
+                        )
+
+                markdown_content += (
+                    "\n## Recommended Content Outline\n\n"
+                )
+
+                for number, section in enumerate(
+                    strategy.recommended_outline,
+                    start=1
+                ):
+                    markdown_content += (
+                        f"{number}. {section}\n"
+                    )
+
+                safe_cluster = re.sub(
+                    r"[^a-zA-Z0-9_-]+",
+                    "_",
+                    selected_cluster.strip()
+                ).strip("_")
+
+                if not safe_cluster:
+                    safe_cluster = "cluster"
+
+                st.download_button(
+                    label=(
+                        "⬇️ Download Content Strategy "
+                        "(.md)"
+                    ),
+                    data=markdown_content.encode(
+                        "utf-8"
+                    ),
+                    file_name=(
+                        f"{safe_topic}_"
+                        f"{safe_cluster}_"
+                        "content_strategy.md"
+                    ),
+                    mime="text/markdown",
+                    on_click="ignore"
+                )
 
     # ---------------------------------
     # CSV export
@@ -602,15 +725,6 @@ if "keyword_results" in st.session_state:
     csv_data = filtered_df.to_csv(
         index=False
     ).encode("utf-8")
-
-
-    safe_topic = re.sub(
-        r"[^a-zA-Z0-9_-]+",
-        "_",
-        st.session_state[
-            "seed_topic"
-        ].strip()
-    )
 
 
     st.download_button(
